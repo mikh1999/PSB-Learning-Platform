@@ -1,0 +1,166 @@
+// PSB Learning Platform - Database Schema
+// https://dbdiagram.io
+// ТРЕК: ПРЕПОДАВАТЕЛЬ
+
+// =====================
+// РЕАЛИЗОВАНО
+// =====================
+
+Table users {
+  id integer [pk, increment]
+  email varchar(255) [unique, not null]
+  hashed_password varchar(255) [not null]
+  first_name varchar(100) [not null]
+  last_name varchar(100) [not null]
+  role user_role [not null, default: 'student']
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    email
+  }
+}
+
+Table courses {
+  id integer [pk, increment]
+  title varchar(255) [not null]
+  description text
+  teacher_id integer [not null, ref: > users.id]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Enum user_role {
+  student
+  teacher
+}
+
+Table lessons {
+  id integer [pk, increment]
+  course_id integer [not null, ref: > courses.id]
+  title varchar(255) [not null]
+  content text
+  order integer [not null, default: 0]
+  type lesson_type [not null, default: 'text']
+  file_url varchar(500)
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Enum lesson_type {
+  text
+  video
+  file
+}
+
+// =====================
+// ПЛАНИРУЕТСЯ
+// =====================
+
+Table assignments {
+  id integer [pk, increment]
+  lesson_id integer [not null, ref: > lessons.id]
+  title varchar(255) [not null]
+  description text
+  deadline timestamp
+  max_score integer [default: 100]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table submissions {
+  id integer [pk, increment]
+  assignment_id integer [not null, ref: > assignments.id]
+  student_id integer [not null, ref: > users.id]
+  file_url varchar(500)
+  status submission_status [not null, default: 'pending']
+  submitted_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (assignment_id, student_id) [unique]
+  }
+}
+
+Enum submission_status {
+  pending
+  submitted
+  graded
+}
+
+Table grades {
+  id integer [pk, increment]
+  submission_id integer [not null, ref: - submissions.id]
+  score integer [not null]
+  comment text
+  graded_by integer [not null, ref: > users.id]
+  graded_at timestamp [default: `now()`]
+}
+
+Table enrollments {
+  id integer [pk, increment]
+  student_id integer [not null, ref: > users.id]
+  course_id integer [not null, ref: > courses.id]
+  progress integer [default: 0]
+  enrolled_at timestamp [default: `now()`]
+
+  indexes {
+    (student_id, course_id) [unique]
+  }
+}
+
+Table lesson_progress {
+  id integer [pk, increment]
+  student_id integer [not null, ref: > users.id]
+  lesson_id integer [not null, ref: > lessons.id]
+  completed boolean [default: false]
+  completed_at timestamp
+
+  indexes {
+    (student_id, lesson_id) [unique]
+  }
+}
+
+// =====================
+// БОНУСНЫЕ ФИЧИ
+// =====================
+
+Table quizzes {
+  id integer [pk, increment]
+  lesson_id integer [not null, ref: > lessons.id]
+  title varchar(255) [not null]
+  created_at timestamp [default: `now()`]
+}
+
+Table quiz_questions {
+  id integer [pk, increment]
+  quiz_id integer [not null, ref: > quizzes.id]
+  question text [not null]
+  type question_type [not null]
+  options json
+  correct_answer json [not null]
+  order integer [default: 0]
+}
+
+Enum question_type {
+  multiple_choice
+  matching
+}
+
+Table quiz_attempts {
+  id integer [pk, increment]
+  quiz_id integer [not null, ref: > quizzes.id]
+  student_id integer [not null, ref: > users.id]
+  answers json
+  score integer
+  attempted_at timestamp [default: `now()`]
+}
+
+Table chat_messages {
+  id integer [pk, increment]
+  course_id integer [not null, ref: > courses.id]
+  user_id integer [not null, ref: > users.id]
+  message text [not null]
+  created_at timestamp [default: `now()`]
+}
