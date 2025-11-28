@@ -9,6 +9,8 @@ from app.api.v1.endpoints import (
     grades,
     enrollments,
     files,
+    progress,
+    gradebook,
 )
 
 api_router = APIRouter()
@@ -20,3 +22,5 @@ api_router.include_router(submissions.router)
 api_router.include_router(grades.router)
 api_router.include_router(enrollments.router)
 api_router.include_router(files.router)
+api_router.include_router(progress.router)
+api_router.include_router(gradebook.router)
