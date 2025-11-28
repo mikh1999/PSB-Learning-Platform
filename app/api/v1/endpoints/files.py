@@ -1,6 +1,7 @@
+import re
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +14,9 @@ from app.db.session import get_async_session
 from app.models.user import User, UserRole
 
 router = APIRouter(prefix="/files", tags=["Files"])
+
+# Chunk size for video streaming (2 MB)
+STREAM_CHUNK_SIZE = 2 * 1024 * 1024
 
 
 # ============== Lesson Files ==============
@@ -137,6 +141,112 @@ async def delete_lesson_file(
         await db.commit()
 
     return {"message": "File deleted successfully"}
+
+
+# ============== Video Streaming ==============
+
+
+@router.get("/stream/lessons/{course_id}/{lesson_id}")
+async def stream_lesson_video(
+    course_id: int,
+    lesson_id: int,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """
+    Stream video file with Range Requests support for seeking.
+
+    Supports HTTP Range Requests for video seeking/scrubbing.
+    Returns 206 Partial Content for range requests, 200 OK for full file.
+    """
+    # Check course exists
+    course = await course_crud.get_by_id(db, course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found",
+        )
+
+    # Check lesson exists
+    lesson = await lesson_crud.get_by_id(db, lesson_id)
+    if not lesson or lesson.course_id != course_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found",
+        )
+
+    # Check file exists
+    if not lesson.content or not lesson.content.startswith("lessons/"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No file attached to this lesson",
+        )
+
+    # Check it's a video file
+    if not storage.is_video_file(lesson.content):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This endpoint only supports video files. Use /files/lessons/ for other file types.",
+        )
+
+    # Get file info
+    file_path = lesson.content
+    file_size = storage.get_file_size(file_path)
+    content_type = storage.get_content_type(file_path)
+
+    # Parse Range header
+    range_header = request.headers.get("range")
+
+    if range_header:
+        # Parse "bytes=start-end" format
+        range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+        if not range_match:
+            raise HTTPException(
+                status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+                detail="Invalid Range header format",
+            )
+
+        start = int(range_match.group(1))
+        end_str = range_match.group(2)
+
+        if end_str:
+            end = int(end_str)
+        else:
+            # If end not specified, return chunk of STREAM_CHUNK_SIZE
+            end = min(start + STREAM_CHUNK_SIZE - 1, file_size - 1)
+
+        # Validate range
+        if start >= file_size or end >= file_size or start > end:
+            raise HTTPException(
+                status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+                detail=f"Range not satisfiable. File size: {file_size}",
+            )
+
+        # Read the requested range
+        content = await storage.read_range(file_path, start, end)
+        content_length = end - start + 1
+
+        return Response(
+            content=content,
+            status_code=status.HTTP_206_PARTIAL_CONTENT,
+            headers={
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(content_length),
+                "Content-Type": content_type,
+            },
+        )
+    else:
+        # No Range header - return full file as streaming response
+        return StreamingResponse(
+            storage.download(file_path),
+            media_type=content_type,
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(file_size),
+            },
+        )
 
 
 # ============== Submission Files ==============
