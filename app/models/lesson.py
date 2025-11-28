@@ -9,6 +9,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.assignment import Assignment
+    from app.models.lesson_progress import LessonProgress
 
 
 class LessonType(str, enum.Enum):
@@ -34,5 +35,8 @@ class Lesson(Base):
 
     course: Mapped["Course"] = relationship(back_populates="lessons")
     assignments: Mapped[list["Assignment"]] = relationship(
+        back_populates="lesson", cascade="all, delete-orphan"
+    )
+    progress_records: Mapped[list["LessonProgress"]] = relationship(
         back_populates="lesson", cascade="all, delete-orphan"
     )

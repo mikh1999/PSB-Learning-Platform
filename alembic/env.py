@@ -16,6 +16,7 @@ from app.models.assignment import Assignment  # noqa: F401
 from app.models.submission import Submission  # noqa: F401
 from app.models.grade import Grade  # noqa: F401
 from app.models.enrollment import Enrollment  # noqa: F401
+from app.models.lesson_progress import LessonProgress  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
