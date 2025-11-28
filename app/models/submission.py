@@ -8,9 +8,10 @@ from app.db.base import Base
 
 
 class SubmissionStatus(str, Enum):
-    PENDING = "pending"
-    SUBMITTED = "submitted"
-    GRADED = "graded"
+    DRAFT = "draft"              # черновик
+    SUBMITTED = "submitted"      # на проверке
+    GRADED = "graded"            # проверено
+    RETURNED = "returned"        # вернули на доработку
 
 
 class Submission(Base):
@@ -24,7 +25,7 @@ class Submission(Base):
     file_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[SubmissionStatus] = mapped_column(
-        SQLEnum(SubmissionStatus), default=SubmissionStatus.PENDING
+        SQLEnum(SubmissionStatus), default=SubmissionStatus.DRAFT
     )
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

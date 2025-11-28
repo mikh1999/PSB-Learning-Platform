@@ -1,7 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.course import Course
+from app.models.course import Course, CourseStatus
 from app.schemas.course import CourseCreate, CourseUpdate
 
 
@@ -33,6 +33,7 @@ class CourseCRUD:
         course = Course(
             title=course_in.title,
             description=course_in.description,
+            status=course_in.status,
             teacher_id=teacher_id,
         )
         db.add(course)
@@ -53,6 +54,16 @@ class CourseCRUD:
     async def delete(self, db: AsyncSession, course: Course) -> None:
         await db.delete(course)
         await db.commit()
+
+    async def get_random_published(self, db: AsyncSession, limit: int = 3) -> list[Course]:
+        """Получить случайные опубликованные курсы."""
+        result = await db.execute(
+            select(Course)
+            .where(Course.status == CourseStatus.PUBLISHED)
+            .order_by(func.random())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
 
 
 course_crud = CourseCRUD()

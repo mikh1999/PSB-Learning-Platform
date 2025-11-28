@@ -144,5 +144,79 @@ class LocalStorage:
         """Extract original-style filename from path."""
         return Path(path).name
 
+    def get_file_size(self, path: str) -> int:
+        """Get file size in bytes."""
+        full_path = self.base_path / path
+
+        if not full_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found",
+            )
+
+        return full_path.stat().st_size
+
+    def get_full_path(self, path: str) -> Path:
+        """Get full filesystem path."""
+        full_path = self.base_path / path
+
+        if not full_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found",
+            )
+
+        return full_path
+
+    async def read_range(self, path: str, start: int, end: int) -> bytes:
+        """
+        Read a byte range from file.
+
+        Args:
+            path: Relative path to file
+            start: Start byte position (inclusive)
+            end: End byte position (inclusive)
+
+        Returns:
+            Bytes from the specified range
+        """
+        full_path = self.base_path / path
+
+        if not full_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found",
+            )
+
+        async with aiofiles.open(full_path, "rb") as f:
+            await f.seek(start)
+            length = end - start + 1
+            return await f.read(length)
+
+    def is_video_file(self, path: str) -> bool:
+        """Check if file is a video."""
+        ext = Path(path).suffix.lower()
+        return ext in {".mp4", ".webm", ".mov", ".avi", ".mkv"}
+
+    def get_content_type(self, path: str) -> str:
+        """Get MIME type for file."""
+        ext = Path(path).suffix.lower()
+        mime_types = {
+            ".mp4": "video/mp4",
+            ".webm": "video/webm",
+            ".mov": "video/quicktime",
+            ".avi": "video/x-msvideo",
+            ".mkv": "video/x-matroska",
+            ".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".zip": "application/zip",
+            ".txt": "text/plain",
+            ".md": "text/markdown",
+            ".py": "text/x-python",
+            ".ipynb": "application/x-ipynb+json",
+        }
+        return mime_types.get(ext, "application/octet-stream")
+
 
 storage = LocalStorage()

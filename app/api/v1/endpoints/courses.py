@@ -7,9 +7,17 @@ from app.api.deps import get_current_active_user
 from app.crud.course import course_crud
 from app.db.session import get_async_session
 from app.models.user import User, UserRole
-from app.schemas.course import CourseCreate, CourseRead, CourseUpdate
+from app.schemas.course import CourseCreate, CoursePublic, CourseRead, CourseUpdate
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
+
+
+@router.get("/featured", response_model=list[CoursePublic])
+async def get_featured_courses(
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+):
+    """Получить случайные опубликованные курсы для главной страницы. Без авторизации."""
+    return await course_crud.get_random_published(db, limit=3)
 
 
 @router.get("/", response_model=list[CourseRead])
