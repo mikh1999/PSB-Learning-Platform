@@ -12,6 +12,9 @@ from app.models.user import User
 from app.schemas.token import TokenPayload
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_PREFIX}/auth/login", auto_error=False
+)
 
 
 async def get_current_user(
@@ -50,3 +53,26 @@ async def get_current_active_user(
             detail="Ваш аккаунт ожидает подтверждения администратором"
         )
     return current_user
+
+
+async def get_current_user_optional(
+    token: Annotated[str | None, Depends(oauth2_scheme_optional)],
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+) -> User | None:
+    """Опциональная аутентификация — возвращает None вместо ошибки."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        user_id: str | None = payload.get("sub")
+        token_type: str | None = payload.get("type")
+        if user_id is None or token_type != "access":
+            return None
+        user = await user_crud.get_by_id(db, int(user_id))
+        if user is None or not user.is_active:
+            return None
+        return user
+    except JWTError:
+        return None

@@ -3,13 +3,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
+from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, get_current_user_optional
+from app.core.config import settings
 from app.core.storage import storage
 from app.crud.course import course_crud
 from app.crud.lesson import lesson_crud
 from app.crud.submission import submission_crud
+from app.crud.user import user_crud
 from app.db.session import get_async_session
 from app.models.user import User, UserRole
 
@@ -17,6 +20,26 @@ router = APIRouter(prefix="/files", tags=["Files"])
 
 # Chunk size for video streaming (2 MB)
 STREAM_CHUNK_SIZE = 2 * 1024 * 1024
+
+
+async def get_user_from_token(token: str, db: AsyncSession) -> User:
+    """Получить пользователя из токена (для элементов, которые не могут отправить заголовок)."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Недействительный токен",
+    )
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = await user_crud.get_by_id(db, int(user_id))
+    if user is None or not user.is_active:
+        raise credentials_exception
+    return user
 
 
 # ============== Lesson Files ==============
@@ -75,9 +98,25 @@ async def download_lesson_file(
     course_id: int,
     lesson_id: int,
     db: Annotated[AsyncSession, Depends(get_async_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User | None, Depends(get_current_user_optional)],
+    token: str | None = None,
 ):
-    """Download lesson file. Enrolled students and course owner can download."""
+    """
+    Download lesson file. Enrolled students and course owner can download.
+
+    Authentication: via Authorization header OR ?token= query parameter.
+    Query parameter is needed for iframe/img elements which can't set headers.
+    """
+    # Authenticate via header or query parameter
+    if current_user is None and token:
+        current_user = await get_user_from_token(token, db)
+
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Требуется аутентификация",
+        )
+
     course = await course_crud.get_by_id(db, course_id)
     if not course:
         raise HTTPException(
@@ -99,11 +138,27 @@ async def download_lesson_file(
         )
 
     filename = storage.get_filename(lesson.content)
+    content_type = storage.get_content_type(lesson.content)
+
+    # For PDFs and images, show inline; for others, force download
+    inline_types = [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+    ]
+
+    if content_type in inline_types:
+        disposition = f'inline; filename="{filename}"'
+    else:
+        disposition = f'attachment; filename="{filename}"'
 
     return StreamingResponse(
         storage.download(lesson.content),
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        media_type=content_type,
+        headers={"Content-Disposition": disposition},
     )
 
 
@@ -152,14 +207,28 @@ async def stream_lesson_video(
     lesson_id: int,
     request: Request,
     db: Annotated[AsyncSession, Depends(get_async_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User | None, Depends(get_current_user_optional)],
+    token: str | None = None,
 ):
     """
     Stream video file with Range Requests support for seeking.
 
     Supports HTTP Range Requests for video seeking/scrubbing.
     Returns 206 Partial Content for range requests, 200 OK for full file.
+
+    Authentication: via Authorization header OR ?token= query parameter.
+    Query parameter is needed for video elements which can't set headers.
     """
+    # Authenticate via header or query parameter
+    if current_user is None and token:
+        current_user = await get_user_from_token(token, db)
+
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Требуется аутентификация",
+        )
+
     # Check course exists
     course = await course_crud.get_by_id(db, course_id)
     if not course:
