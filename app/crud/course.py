@@ -16,6 +16,10 @@ class CourseCRUD:
         result = await db.execute(select(Course).offset(skip).limit(limit))
         return list(result.scalars().all())
 
+    async def count_all(self, db: AsyncSession) -> int:
+        result = await db.execute(select(func.count(Course.id)))
+        return result.scalar() or 0
+
     async def get_by_teacher(
         self, db: AsyncSession, teacher_id: int, skip: int = 0, limit: int = 100
     ) -> list[Course]:
@@ -26,6 +30,12 @@ class CourseCRUD:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def count_by_teacher(self, db: AsyncSession, teacher_id: int) -> int:
+        result = await db.execute(
+            select(func.count(Course.id)).where(Course.teacher_id == teacher_id)
+        )
+        return result.scalar() or 0
 
     async def create(
         self, db: AsyncSession, course_in: CourseCreate, teacher_id: int

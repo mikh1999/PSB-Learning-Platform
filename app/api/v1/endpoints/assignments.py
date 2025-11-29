@@ -10,6 +10,7 @@ from app.crud.lesson import lesson_crud
 from app.db.session import get_async_session
 from app.models.user import User, UserRole
 from app.schemas.assignment import AssignmentCreate, AssignmentRead, AssignmentUpdate
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter(
     prefix="/courses/{course_id}/lessons/{lesson_id}/assignments",
@@ -54,7 +55,7 @@ async def get_lesson_with_access(
     return course, lesson
 
 
-@router.get("/", response_model=list[AssignmentRead])
+@router.get("/", response_model=PaginatedResponse[AssignmentRead])
 async def get_assignments(
     course_id: int,
     lesson_id: int,
@@ -65,7 +66,9 @@ async def get_assignments(
 ):
     """Get all assignments for a lesson."""
     await get_lesson_with_access(course_id, lesson_id, db, current_user)
-    return await assignment_crud.get_by_lesson(db, lesson_id, skip, limit)
+    items = await assignment_crud.get_by_lesson(db, lesson_id, skip, limit)
+    total = await assignment_crud.count_by_lesson(db, lesson_id)
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/{assignment_id}", response_model=AssignmentRead)

@@ -7,6 +7,7 @@ from app.api.deps import get_current_active_user
 from app.crud.course import course_crud
 from app.db.session import get_async_session
 from app.models.user import User, UserRole
+from app.schemas.common import PaginatedResponse
 from app.schemas.course import CourseCreate, CoursePublic, CourseRead, CourseUpdate
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
@@ -20,7 +21,7 @@ async def get_featured_courses(
     return await course_crud.get_random_published(db, limit=3)
 
 
-@router.get("/", response_model=list[CourseRead])
+@router.get("/", response_model=PaginatedResponse[CourseRead])
 async def get_courses(
     db: Annotated[AsyncSession, Depends(get_async_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -29,8 +30,12 @@ async def get_courses(
 ):
     """Get all courses. Teachers see only their courses."""
     if current_user.role == UserRole.TEACHER:
-        return await course_crud.get_by_teacher(db, current_user.id, skip, limit)
-    return await course_crud.get_all(db, skip, limit)
+        items = await course_crud.get_by_teacher(db, current_user.id, skip, limit)
+        total = await course_crud.count_by_teacher(db, current_user.id)
+    else:
+        items = await course_crud.get_all(db, skip, limit)
+        total = await course_crud.count_all(db)
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/{course_id}", response_model=CourseRead)

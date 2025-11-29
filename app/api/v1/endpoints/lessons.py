@@ -8,6 +8,7 @@ from app.crud.course import course_crud
 from app.crud.lesson import lesson_crud
 from app.db.session import get_async_session
 from app.models.user import User, UserRole
+from app.schemas.common import PaginatedResponse
 from app.schemas.lesson import LessonCreate, LessonRead, LessonUpdate
 
 router = APIRouter(prefix="/courses/{course_id}/lessons", tags=["Lessons"])
@@ -40,7 +41,7 @@ async def get_course_with_access(
     return course
 
 
-@router.get("/", response_model=list[LessonRead])
+@router.get("/", response_model=PaginatedResponse[LessonRead])
 async def get_lessons(
     course_id: int,
     db: Annotated[AsyncSession, Depends(get_async_session)],
@@ -50,7 +51,9 @@ async def get_lessons(
 ):
     """Get all lessons for a course."""
     await get_course_with_access(course_id, db, current_user)
-    return await lesson_crud.get_by_course(db, course_id, skip, limit)
+    items = await lesson_crud.get_by_course(db, course_id, skip, limit)
+    total = await lesson_crud.count_by_course(db, course_id)
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/{lesson_id}", response_model=LessonRead)

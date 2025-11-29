@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.lesson import Lesson
@@ -21,6 +21,12 @@ class LessonCRUD:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def count_by_course(self, db: AsyncSession, course_id: int) -> int:
+        result = await db.execute(
+            select(func.count(Lesson.id)).where(Lesson.course_id == course_id)
+        )
+        return result.scalar() or 0
 
     async def create(
         self, db: AsyncSession, lesson_in: LessonCreate, course_id: int

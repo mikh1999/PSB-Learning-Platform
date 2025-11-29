@@ -11,6 +11,7 @@ from app.crud.submission import submission_crud
 from app.db.session import get_async_session
 from app.models.submission import SubmissionStatus
 from app.models.user import User, UserRole
+from app.schemas.common import PaginatedResponse
 from app.schemas.submission import SubmissionCreate, SubmissionRead, SubmissionUpdate
 
 router = APIRouter(
@@ -57,7 +58,7 @@ async def get_assignment_with_access(
     return course, lesson, assignment
 
 
-@router.get("/", response_model=list[SubmissionRead])
+@router.get("/", response_model=PaginatedResponse[SubmissionRead])
 async def get_submissions(
     course_id: int,
     lesson_id: int,
@@ -73,12 +74,15 @@ async def get_submissions(
     )
 
     if current_user.role == UserRole.TEACHER and course.teacher_id == current_user.id:
-        return await submission_crud.get_by_assignment(db, assignment_id, skip, limit)
+        items = await submission_crud.get_by_assignment(db, assignment_id, skip, limit)
+        total = await submission_crud.count_by_assignment(db, assignment_id)
     else:
         submission = await submission_crud.get_by_assignment_and_student(
             db, assignment_id, current_user.id
         )
-        return [submission] if submission else []
+        items = [submission] if submission else []
+        total = 1 if submission else 0
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/my", response_model=SubmissionRead | None)

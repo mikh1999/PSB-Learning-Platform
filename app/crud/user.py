@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_password_hash, verify_password
@@ -44,6 +44,51 @@ class UserCRUD:
             return None
         if not verify_password(password, user.hashed_password):
             return None
+        return user
+
+    async def get_all(
+        self, db: AsyncSession, skip: int = 0, limit: int = 100
+    ) -> list[User]:
+        result = await db.execute(
+            select(User).offset(skip).limit(limit).order_by(User.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def get_pending(
+        self, db: AsyncSession, skip: int = 0, limit: int = 100
+    ) -> list[User]:
+        """Получить пользователей на рассмотрении (is_active=False)."""
+        result = await db.execute(
+            select(User)
+            .where(User.is_active == False)
+            .offset(skip)
+            .limit(limit)
+            .order_by(User.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def count_all(self, db: AsyncSession) -> int:
+        result = await db.execute(select(func.count(User.id)))
+        return result.scalar() or 0
+
+    async def count_pending(self, db: AsyncSession) -> int:
+        result = await db.execute(
+            select(func.count(User.id)).where(User.is_active == False)
+        )
+        return result.scalar() or 0
+
+    async def activate(self, db: AsyncSession, user: User) -> User:
+        """Активировать пользователя."""
+        user.is_active = True
+        await db.commit()
+        await db.refresh(user)
+        return user
+
+    async def deactivate(self, db: AsyncSession, user: User) -> User:
+        """Деактивировать пользователя."""
+        user.is_active = False
+        await db.commit()
+        await db.refresh(user)
         return user
 
 

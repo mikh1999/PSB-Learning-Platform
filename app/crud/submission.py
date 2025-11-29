@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.submission import Submission, SubmissionStatus
@@ -35,6 +35,18 @@ class SubmissionCRUD:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def count_by_assignment(self, db: AsyncSession, assignment_id: int) -> int:
+        result = await db.execute(
+            select(func.count(Submission.id)).where(Submission.assignment_id == assignment_id)
+        )
+        return result.scalar() or 0
+
+    async def count_by_student(self, db: AsyncSession, student_id: int) -> int:
+        result = await db.execute(
+            select(func.count(Submission.id)).where(Submission.student_id == student_id)
+        )
+        return result.scalar() or 0
 
     async def get_by_assignment_and_student(
         self, db: AsyncSession, assignment_id: int, student_id: int

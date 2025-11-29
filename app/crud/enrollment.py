@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enrollment import Enrollment
@@ -43,6 +43,18 @@ class EnrollmentCRUD:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def count_by_student(self, db: AsyncSession, student_id: int) -> int:
+        result = await db.execute(
+            select(func.count(Enrollment.id)).where(Enrollment.student_id == student_id)
+        )
+        return result.scalar() or 0
+
+    async def count_by_course(self, db: AsyncSession, course_id: int) -> int:
+        result = await db.execute(
+            select(func.count(Enrollment.id)).where(Enrollment.course_id == course_id)
+        )
+        return result.scalar() or 0
 
     async def create(
         self, db: AsyncSession, student_id: int, course_id: int

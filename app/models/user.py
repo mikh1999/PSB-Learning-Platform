@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 class UserRole(str, enum.Enum):
     STUDENT = "student"
     TEACHER = "teacher"
+    ADMIN = "admin"
 
 
 class User(Base):
@@ -30,7 +31,7 @@ class User(Base):
     first_name: Mapped[str] = mapped_column(String(100))
     last_name: Mapped[str] = mapped_column(String(100))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.STUDENT)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

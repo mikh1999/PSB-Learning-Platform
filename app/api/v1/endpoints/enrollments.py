@@ -9,8 +9,11 @@ from app.api.deps import get_current_active_user
 from app.crud.course import course_crud
 from app.crud.enrollment import enrollment_crud
 from app.db.session import get_async_session
+from app.models.course import Course
 from app.models.enrollment import Enrollment
 from app.models.user import User, UserRole
+from app.schemas.common import PaginatedResponse
+from app.schemas.course import CourseRead
 from app.schemas.enrollment import EnrollmentRead, EnrollmentWithCourse, EnrollmentWithStudent
 
 router = APIRouter(tags=["Enrollments"])
@@ -77,7 +80,7 @@ async def unenroll_from_course(
     await enrollment_crud.delete(db, enrollment)
 
 
-@router.get("/courses/{course_id}/students", response_model=list[EnrollmentWithStudent])
+@router.get("/courses/{course_id}/students", response_model=PaginatedResponse[EnrollmentWithStudent])
 async def get_course_students(
     course_id: int,
     db: Annotated[AsyncSession, Depends(get_async_session)],
@@ -108,7 +111,7 @@ async def get_course_students(
     )
     enrollments = result.scalars().all()
 
-    return [
+    items = [
         EnrollmentWithStudent(
             id=e.id,
             student_id=e.student_id,
@@ -121,42 +124,51 @@ async def get_course_students(
         )
         for e in enrollments
     ]
+    total = await enrollment_crud.count_by_course(db, course_id)
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
-@router.get("/my/courses", response_model=list[EnrollmentWithCourse])
+@router.get("/my/courses", response_model=PaginatedResponse[EnrollmentWithCourse] | PaginatedResponse[CourseRead])
 async def get_my_courses(
     db: Annotated[AsyncSession, Depends(get_async_session)],
     current_user: Annotated[User, Depends(get_current_active_user)],
     skip: int = 0,
     limit: int = 100,
 ):
-    """Get list of courses the current student is enrolled in."""
-    if current_user.role != UserRole.STUDENT:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Только студенты могут быть записаны на курсы",
+    """
+    Получить курсы текущего пользователя.
+    - Студенты: курсы, на которые записаны
+    - Преподаватели: курсы, которые они ведут
+    """
+    if current_user.role == UserRole.STUDENT:
+        # Для студентов — курсы через enrollments
+        result = await db.execute(
+            select(Enrollment)
+            .options(selectinload(Enrollment.course))
+            .where(Enrollment.student_id == current_user.id)
+            .offset(skip)
+            .limit(limit)
         )
+        enrollments = result.scalars().all()
 
-    result = await db.execute(
-        select(Enrollment)
-        .options(selectinload(Enrollment.course))
-        .where(Enrollment.student_id == current_user.id)
-        .offset(skip)
-        .limit(limit)
-    )
-    enrollments = result.scalars().all()
-
-    return [
-        EnrollmentWithCourse(
-            id=e.id,
-            student_id=e.student_id,
-            course_id=e.course_id,
-            progress=e.progress,
-            enrolled_at=e.enrolled_at,
-            course_title=e.course.title,
-        )
-        for e in enrollments
-    ]
+        items = [
+            EnrollmentWithCourse(
+                id=e.id,
+                student_id=e.student_id,
+                course_id=e.course_id,
+                progress=e.progress,
+                enrolled_at=e.enrolled_at,
+                course_title=e.course.title,
+            )
+            for e in enrollments
+        ]
+        total = await enrollment_crud.count_by_student(db, current_user.id)
+        return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
+    else:
+        # Для преподавателей — их курсы
+        items = await course_crud.get_by_teacher(db, current_user.id, skip, limit)
+        total = await course_crud.count_by_teacher(db, current_user.id)
+        return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/courses/{course_id}/enrollment", response_model=EnrollmentRead | None)
