@@ -37,22 +37,16 @@ services:
     command: >
       sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-8080}"
 
-  frontend:
-    build:
-      context: ../PSB_frontend
-      dockerfile: Dockerfile
-    container_name: psb_frontend
-    restart: unless-stopped
-
   nginx:
     image: nginx:alpine
     container_name: psb_nginx
     restart: unless-stopped
     depends_on:
       - app
-      - frontend
     ports:
       - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./nginx/conf:/etc/nginx/conf.d
       - ./nginx/certbot:/var/www/certbot
