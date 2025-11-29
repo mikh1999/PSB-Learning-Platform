@@ -30,14 +30,14 @@ async def enroll_in_course(
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only students can enroll in courses",
+            detail="Только студенты могут записываться на курсы",
         )
 
     course = await course_crud.get_by_id(db, course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     existing = await enrollment_crud.get_by_student_and_course(
@@ -46,7 +46,7 @@ async def enroll_in_course(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Already enrolled in this course",
+            detail="Вы уже записаны на этот курс",
         )
 
     return await enrollment_crud.create(db, current_user.id, course_id)
@@ -62,7 +62,7 @@ async def unenroll_from_course(
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only students can unenroll from courses",
+            detail="Только студенты могут отписываться от курсов",
         )
 
     enrollment = await enrollment_crud.get_by_student_and_course(
@@ -71,7 +71,7 @@ async def unenroll_from_course(
     if not enrollment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Not enrolled in this course",
+            detail="Вы не записаны на этот курс",
         )
 
     await enrollment_crud.delete(db, enrollment)
@@ -90,13 +90,13 @@ async def get_course_students(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     if course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only course teacher can view enrolled students",
+            detail="Только преподаватель курса может просматривать записанных студентов",
         )
 
     result = await db.execute(
@@ -134,7 +134,7 @@ async def get_my_courses(
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only students have course enrollments",
+            detail="Только студенты могут быть записаны на курсы",
         )
 
     result = await db.execute(

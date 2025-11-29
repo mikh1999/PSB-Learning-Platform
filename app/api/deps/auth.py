@@ -20,7 +20,7 @@ async def get_current_user(
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="Не удалось проверить учётные данные",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -46,6 +46,6 @@ async def get_current_active_user(
 ) -> User:
     if not current_user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Пользователь неактивен"
         )
     return current_user

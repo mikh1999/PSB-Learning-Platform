@@ -24,18 +24,18 @@ async def get_course_with_access(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
     if require_owner and course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only course owner can perform this action",
+            detail="Только владелец курса может выполнить это действие",
         )
     # Teachers can only access their own courses
     if current_user.role == UserRole.TEACHER and course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            detail="Доступ запрещён",
         )
     return course
 
@@ -66,7 +66,7 @@ async def get_lesson(
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
     return lesson
 
@@ -97,7 +97,7 @@ async def update_lesson(
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
     return await lesson_crud.update(db, lesson, lesson_in)
 
@@ -115,7 +115,7 @@ async def delete_lesson(
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
     await lesson_crud.delete(db, lesson)
 

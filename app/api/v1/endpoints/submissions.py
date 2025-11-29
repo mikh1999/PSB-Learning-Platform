@@ -31,27 +31,27 @@ async def get_assignment_with_access(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     if current_user.role == UserRole.TEACHER and course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            detail="Доступ запрещён",
         )
 
     lesson = await lesson_crud.get_by_id(db, lesson_id)
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
 
     assignment = await assignment_crud.get_by_id(db, assignment_id)
     if not assignment or assignment.lesson_id != lesson_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found",
+            detail="Задание не найдено",
         )
 
     return course, lesson, assignment
@@ -114,7 +114,7 @@ async def get_submission(
     if not submission or submission.assignment_id != assignment_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
+            detail="Ответ не найден",
         )
 
     is_owner = submission.student_id == current_user.id
@@ -125,7 +125,7 @@ async def get_submission(
     if not is_owner and not is_course_teacher:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            detail="Доступ запрещён",
         )
 
     return submission
@@ -146,7 +146,7 @@ async def create_submission(
     if current_user.role == UserRole.TEACHER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only students can submit work",
+            detail="Только студенты могут сдавать работы",
         )
 
     existing = await submission_crud.get_by_assignment_and_student(
@@ -155,7 +155,7 @@ async def create_submission(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You already have a submission for this assignment. Use PUT to update.",
+            detail="У вас уже есть ответ на это задание. Используйте PUT для обновления.",
         )
 
     return await submission_crud.create(db, submission_in, assignment_id, current_user.id)
@@ -178,19 +178,19 @@ async def update_submission(
     if not submission or submission.assignment_id != assignment_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
+            detail="Ответ не найден",
         )
 
     if submission.student_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only update your own submission",
+            detail="Вы можете обновлять только свои ответы",
         )
 
     if submission.status == SubmissionStatus.GRADED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot update a graded submission",
+            detail="Нельзя обновить оценённый ответ",
         )
 
     return await submission_crud.update(db, submission, submission_in)
@@ -212,19 +212,19 @@ async def delete_submission(
     if not submission or submission.assignment_id != assignment_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
+            detail="Ответ не найден",
         )
 
     if submission.student_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delete your own submission",
+            detail="Вы можете удалять только свои ответы",
         )
 
     if submission.status == SubmissionStatus.GRADED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete a graded submission",
+            detail="Нельзя удалить оценённый ответ",
         )
 
     await submission_crud.delete(db, submission)

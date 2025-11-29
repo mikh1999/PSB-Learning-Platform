@@ -29,26 +29,26 @@ async def get_lesson_with_access(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     if require_owner and course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only course owner can perform this action",
+            detail="Только владелец курса может выполнить это действие",
         )
 
     if current_user.role == UserRole.TEACHER and course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            detail="Доступ запрещён",
         )
 
     lesson = await lesson_crud.get_by_id(db, lesson_id)
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
 
     return course, lesson
@@ -82,7 +82,7 @@ async def get_assignment(
     if not assignment or assignment.lesson_id != lesson_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found",
+            detail="Задание не найдено",
         )
     return assignment
 
@@ -115,7 +115,7 @@ async def update_assignment(
     if not assignment or assignment.lesson_id != lesson_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found",
+            detail="Задание не найдено",
         )
     return await assignment_crud.update(db, assignment, assignment_in)
 
@@ -134,6 +134,6 @@ async def delete_assignment(
     if not assignment or assignment.lesson_id != lesson_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found",
+            detail="Задание не найдено",
         )
     await assignment_crud.delete(db, assignment)

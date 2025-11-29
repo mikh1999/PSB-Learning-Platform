@@ -32,34 +32,34 @@ async def get_submission_with_teacher_access(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     if course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only course teacher can grade submissions",
+            detail="Только преподаватель курса может выставлять оценки",
         )
 
     lesson = await lesson_crud.get_by_id(db, lesson_id)
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
 
     assignment = await assignment_crud.get_by_id(db, assignment_id)
     if not assignment or assignment.lesson_id != lesson_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found",
+            detail="Задание не найдено",
         )
 
     submission = await submission_crud.get_by_id(db, submission_id)
     if not submission or submission.assignment_id != assignment_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
+            detail="Ответ не найден",
         )
 
     return course, lesson, assignment, submission
@@ -79,28 +79,28 @@ async def get_grade(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     lesson = await lesson_crud.get_by_id(db, lesson_id)
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
 
     assignment = await assignment_crud.get_by_id(db, assignment_id)
     if not assignment or assignment.lesson_id != lesson_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found",
+            detail="Задание не найдено",
         )
 
     submission = await submission_crud.get_by_id(db, submission_id)
     if not submission or submission.assignment_id != assignment_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
+            detail="Ответ не найден",
         )
 
     is_owner = submission.student_id == current_user.id
@@ -111,7 +111,7 @@ async def get_grade(
     if not is_owner and not is_course_teacher:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            detail="Доступ запрещён",
         )
 
     return await grade_crud.get_by_submission(db, submission_id)
@@ -136,13 +136,13 @@ async def create_grade(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Submission already graded. Use PUT to update.",
+            detail="Ответ уже оценён. Используйте PUT для обновления.",
         )
 
     if grade_in.score > assignment.max_score:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Score cannot exceed max score ({assignment.max_score})",
+            detail=f"Оценка не может превышать максимальный балл ({assignment.max_score})",
         )
 
     return await grade_crud.create(db, grade_in, submission, current_user.id)
@@ -167,13 +167,13 @@ async def update_grade(
     if not grade:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Grade not found. Use POST to create.",
+            detail="Оценка не найдена. Используйте POST для создания.",
         )
 
     if grade_in.score is not None and grade_in.score > assignment.max_score:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Score cannot exceed max score ({assignment.max_score})",
+            detail=f"Оценка не может превышать максимальный балл ({assignment.max_score})",
         )
 
     return await grade_crud.update(db, grade, grade_in)
@@ -197,7 +197,7 @@ async def delete_grade(
     if not grade:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Grade not found",
+            detail="Оценка не найдена",
         )
 
     await grade_crud.delete(db, grade, submission)

@@ -35,20 +35,20 @@ async def upload_lesson_file(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     if course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only course owner can upload lesson files",
+            detail="Только владелец курса может загружать файлы уроков",
         )
 
     lesson = await lesson_crud.get_by_id(db, lesson_id)
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
 
     # Delete old file if exists
@@ -82,20 +82,20 @@ async def download_lesson_file(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     lesson = await lesson_crud.get_by_id(db, lesson_id)
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
 
     if not lesson.content or not lesson.content.startswith("lessons/"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No file attached to this lesson",
+            detail="К этому уроку не прикреплён файл",
         )
 
     filename = storage.get_filename(lesson.content)
@@ -119,20 +119,20 @@ async def delete_lesson_file(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     if course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only course owner can delete lesson files",
+            detail="Только владелец курса может удалять файлы уроков",
         )
 
     lesson = await lesson_crud.get_by_id(db, lesson_id)
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
 
     if lesson.content and lesson.content.startswith("lessons/"):
@@ -165,7 +165,7 @@ async def stream_lesson_video(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
 
     # Check lesson exists
@@ -173,21 +173,21 @@ async def stream_lesson_video(
     if not lesson or lesson.course_id != course_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lesson not found",
+            detail="Урок не найден",
         )
 
     # Check file exists
     if not lesson.content or not lesson.content.startswith("lessons/"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No file attached to this lesson",
+            detail="К этому уроку не прикреплён файл",
         )
 
     # Check it's a video file
     if not storage.is_video_file(lesson.content):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This endpoint only supports video files. Use /files/lessons/ for other file types.",
+            detail="Этот эндпоинт поддерживает только видеофайлы. Используйте /files/lessons/ для других типов файлов.",
         )
 
     # Get file info
@@ -204,7 +204,7 @@ async def stream_lesson_video(
         if not range_match:
             raise HTTPException(
                 status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
-                detail="Invalid Range header format",
+                detail="Неверный формат заголовка Range",
             )
 
         start = int(range_match.group(1))
@@ -220,7 +220,7 @@ async def stream_lesson_video(
         if start >= file_size or end >= file_size or start > end:
             raise HTTPException(
                 status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
-                detail=f"Range not satisfiable. File size: {file_size}",
+                detail=f"Диапазон недоступен. Размер файла: {file_size}",
             )
 
         # Read the requested range
@@ -264,13 +264,13 @@ async def upload_submission_file(
     if not submission:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
+            detail="Ответ не найден",
         )
 
     if submission.student_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only upload files to your own submission",
+            detail="Вы можете загружать файлы только к своим ответам",
         )
 
     # Delete old file if exists
@@ -302,7 +302,7 @@ async def download_submission_file(
     if not submission:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found",
+            detail="Ответ не найден",
         )
 
     # Check access: owner or teacher of the course
@@ -319,13 +319,13 @@ async def download_submission_file(
     if not is_owner and not is_teacher:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            detail="Доступ запрещён",
         )
 
     if not submission.file_url or not submission.file_url.startswith("submissions/"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No file attached to this submission",
+            detail="К этому ответу не прикреплён файл",
         )
 
     filename = storage.get_filename(submission.file_url)

@@ -44,13 +44,13 @@ async def get_course(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
     # Teachers can only view their own courses
     if current_user.role == UserRole.TEACHER and course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            detail="Доступ запрещён",
         )
     return course
 
@@ -65,7 +65,7 @@ async def create_course(
     if current_user.role != UserRole.TEACHER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only teachers can create courses",
+            detail="Только преподаватели могут создавать курсы",
         )
     return await course_crud.create(db, course_in, current_user.id)
 
@@ -82,12 +82,12 @@ async def update_course(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
     if course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only course owner can update",
+            detail="Только владелец курса может редактировать",
         )
     return await course_crud.update(db, course, course_in)
 
@@ -103,11 +103,11 @@ async def delete_course(
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found",
+            detail="Курс не найден",
         )
     if course.teacher_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only course owner can delete",
+            detail="Только владелец курса может удалять",
         )
     await course_crud.delete(db, course)

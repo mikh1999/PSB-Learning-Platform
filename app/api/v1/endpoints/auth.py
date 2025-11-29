@@ -27,7 +27,7 @@ async def register(
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email already exists",
+            detail="Пользователь с таким email уже существует",
         )
     user = await user_crud.create(db, user_in)
     return user
@@ -43,13 +43,13 @@ async def login(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Неверный email или пароль",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user",
+            detail="Пользователь неактивен",
         )
     return Token(
         access_token=create_access_token(user.id),
@@ -65,7 +65,7 @@ async def refresh_token(
     """Get new access token using refresh token."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid refresh token",
+        detail="Недействительный токен обновления",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
