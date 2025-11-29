@@ -42,6 +42,34 @@ async def get_user_from_token(token: str, db: AsyncSession) -> User:
     return user
 
 
+# ============== File Validation ==============
+
+
+@router.post("/validate")
+async def validate_file_format(
+    filename: str,
+    file_type: str = "lessons",
+):
+    """
+    Validate file format before uploading.
+    Call this before creating a lesson to ensure file format is allowed.
+
+    Args:
+        filename: Name of the file to validate
+        file_type: 'lessons' or 'submissions'
+
+    Returns:
+        {"valid": true/false, "error": "message if invalid"}
+    """
+    result = storage.validate_file_format(filename, file_type)
+    if not result["valid"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result["error"],
+        )
+    return result
+
+
 # ============== Lesson Files ==============
 
 

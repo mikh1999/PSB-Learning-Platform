@@ -102,5 +102,14 @@ class SubmissionCRUD:
         await db.refresh(submission)
         return submission
 
+    async def return_for_revision(
+        self, db: AsyncSession, submission: Submission
+    ) -> Submission:
+        """Вернуть работу на доработку."""
+        submission.status = SubmissionStatus.RETURNED
+        await db.commit()
+        await db.refresh(submission)
+        return submission
+
 
 submission_crud = SubmissionCRUD()

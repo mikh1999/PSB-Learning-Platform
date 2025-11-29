@@ -1,10 +1,14 @@
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import String, Text, ForeignKey, DateTime, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.submission_comment import SubmissionComment
 
 
 class SubmissionStatus(str, Enum):
@@ -37,4 +41,7 @@ class Submission(Base):
     student: Mapped["User"] = relationship(back_populates="submissions")
     grade: Mapped["Grade | None"] = relationship(
         back_populates="submission", cascade="all, delete-orphan", uselist=False
+    )
+    comments: Mapped[list["SubmissionComment"]] = relationship(
+        back_populates="submission", cascade="all, delete-orphan", order_by="SubmissionComment.created_at"
     )

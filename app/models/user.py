@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.grade import Grade
     from app.models.enrollment import Enrollment
     from app.models.lesson_progress import LessonProgress
+    from app.models.submission_comment import SubmissionComment
 
 
 class UserRole(str, enum.Enum):
@@ -43,3 +44,4 @@ class User(Base):
     graded_submissions: Mapped[list["Grade"]] = relationship(back_populates="grader")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")
     lesson_progress: Mapped[list["LessonProgress"]] = relationship(back_populates="student")
+    submission_comments: Mapped[list["SubmissionComment"]] = relationship(back_populates="user")

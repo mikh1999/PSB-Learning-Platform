@@ -12,7 +12,9 @@ from app.db.session import get_async_session
 from app.models.submission import SubmissionStatus
 from app.models.user import User, UserRole
 from app.schemas.common import PaginatedResponse
+from app.crud.submission_comment import submission_comment_crud
 from app.schemas.submission import SubmissionCreate, SubmissionRead, SubmissionUpdate
+from app.schemas.submission_comment import SubmissionCommentCreate, SubmissionCommentRead
 
 router = APIRouter(
     prefix="/courses/{course_id}/lessons/{lesson_id}/assignments/{assignment_id}/submissions",
@@ -232,3 +234,149 @@ async def delete_submission(
         )
 
     await submission_crud.delete(db, submission)
+
+
+@router.post("/{submission_id}/return", response_model=SubmissionRead)
+async def return_submission(
+    course_id: int,
+    lesson_id: int,
+    assignment_id: int,
+    submission_id: int,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """
+    Вернуть работу на доработку.
+    Только преподаватель курса может вернуть работу.
+    """
+    course, lesson, assignment = await get_assignment_with_access(
+        course_id, lesson_id, assignment_id, db, current_user
+    )
+
+    if course.teacher_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только преподаватель курса может вернуть работу на доработку",
+        )
+
+    submission = await submission_crud.get_by_id(db, submission_id)
+    if not submission or submission.assignment_id != assignment_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ответ не найден",
+        )
+
+    if submission.status == SubmissionStatus.RETURNED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Работа уже возвращена на доработку",
+        )
+
+    if submission.status == SubmissionStatus.GRADED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя вернуть уже оценённую работу. Сначала удалите оценку.",
+        )
+
+    return await submission_crud.return_for_revision(db, submission)
+
+
+# ===== Комментарии к работе (чат) =====
+
+
+@router.get("/{submission_id}/comments", response_model=list[SubmissionCommentRead])
+async def get_submission_comments(
+    course_id: int,
+    lesson_id: int,
+    assignment_id: int,
+    submission_id: int,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """
+    Получить все комментарии к работе.
+    Доступно студенту-автору и преподавателю курса.
+    """
+    course, lesson, assignment = await get_assignment_with_access(
+        course_id, lesson_id, assignment_id, db, current_user
+    )
+
+    submission = await submission_crud.get_by_id(db, submission_id)
+    if not submission or submission.assignment_id != assignment_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ответ не найден",
+        )
+
+    is_owner = submission.student_id == current_user.id
+    is_course_teacher = current_user.role == UserRole.TEACHER and course.teacher_id == current_user.id
+
+    if not is_owner and not is_course_teacher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ запрещён",
+        )
+
+    comments = await submission_comment_crud.get_by_submission(db, submission_id)
+
+    # Добавляем информацию об авторе
+    result = []
+    for comment in comments:
+        await db.refresh(comment, ["user"])
+        result.append(SubmissionCommentRead(
+            id=comment.id,
+            submission_id=comment.submission_id,
+            user_id=comment.user_id,
+            content=comment.content,
+            created_at=comment.created_at,
+            author_name=f"{comment.user.first_name} {comment.user.last_name}",
+            author_role=comment.user.role.value,
+        ))
+    return result
+
+
+@router.post("/{submission_id}/comments", response_model=SubmissionCommentRead, status_code=status.HTTP_201_CREATED)
+async def create_submission_comment(
+    course_id: int,
+    lesson_id: int,
+    assignment_id: int,
+    submission_id: int,
+    comment_in: SubmissionCommentCreate,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """
+    Добавить комментарий к работе.
+    Доступно студенту-автору и преподавателю курса.
+    """
+    course, lesson, assignment = await get_assignment_with_access(
+        course_id, lesson_id, assignment_id, db, current_user
+    )
+
+    submission = await submission_crud.get_by_id(db, submission_id)
+    if not submission or submission.assignment_id != assignment_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ответ не найден",
+        )
+
+    is_owner = submission.student_id == current_user.id
+    is_course_teacher = current_user.role == UserRole.TEACHER and course.teacher_id == current_user.id
+
+    if not is_owner and not is_course_teacher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ запрещён",
+        )
+
+    comment = await submission_comment_crud.create(db, comment_in, submission_id, current_user.id)
+
+    return SubmissionCommentRead(
+        id=comment.id,
+        submission_id=comment.submission_id,
+        user_id=comment.user_id,
+        content=comment.content,
+        created_at=comment.created_at,
+        author_name=f"{current_user.first_name} {current_user.last_name}",
+        author_role=current_user.role.value,
+    )

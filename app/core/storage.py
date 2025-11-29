@@ -34,7 +34,7 @@ class LocalStorage:
         if not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Filename is required",
+                detail="Имя файла обязательно",
             )
 
         ext = Path(file.filename).suffix.lower()
@@ -43,10 +43,29 @@ class LocalStorage:
         if ext not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File type {ext} not allowed. Allowed: {', '.join(allowed)}",
+                detail=f"Формат {ext} не поддерживается. Разрешённые форматы: {', '.join(allowed)}",
             )
 
         return ext
+
+    def validate_file_format(self, filename: str, file_type: str) -> dict:
+        """
+        Validate file format without uploading.
+        Returns validation result.
+        """
+        if not filename:
+            return {"valid": False, "error": "Имя файла обязательно"}
+
+        ext = Path(filename).suffix.lower()
+        allowed = self._get_allowed_extensions(file_type)
+
+        if ext not in allowed:
+            return {
+                "valid": False,
+                "error": f"Формат {ext} не поддерживается. Разрешённые форматы: {', '.join(allowed)}"
+            }
+
+        return {"valid": True, "extension": ext}
 
     def _generate_filename(self, original_filename: str) -> str:
         """Generate unique filename preserving extension."""

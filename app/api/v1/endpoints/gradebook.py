@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,9 +12,10 @@ from app.crud.course import course_crud
 from app.crud.enrollment import enrollment_crud
 from app.db.session import get_async_session
 from app.models.assignment import Assignment
+from app.models.course import Course
 from app.models.grade import Grade
 from app.models.lesson import Lesson
-from app.models.submission import Submission
+from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 
 router = APIRouter(prefix="/gradebook", tags=["Gradebook"])
@@ -252,3 +254,102 @@ async def get_my_grades(
         percentage=percentage,
         grades=grades_list,
     )
+
+
+# === Pending Submissions for Teacher ===
+
+
+class PendingSubmissionItem(BaseModel):
+    submission_id: int
+    student_id: int
+    student_name: str
+    student_email: str
+    assignment_id: int
+    assignment_title: str
+    max_score: int
+    lesson_id: int
+    lesson_title: str
+    course_id: int
+    course_title: str
+    content: str | None
+    file_url: str | None
+    submitted_at: datetime | None
+    status: str
+
+
+class PendingSubmissionsResponse(BaseModel):
+    items: list[PendingSubmissionItem]
+    total: int
+
+
+@router.get("/pending", response_model=PendingSubmissionsResponse)
+async def get_pending_submissions(
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    status_filter: str | None = None,
+):
+    """
+    Get all submissions for teacher's courses.
+    Teachers only.
+
+    Args:
+        status_filter: Filter by status (submitted, graded, returned, all).
+                      Default: submitted (pending review).
+    """
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только преподаватели могут просматривать задания на проверку",
+        )
+
+    # Build query
+    query = (
+        select(Submission, Assignment, Lesson, Course, User)
+        .join(Assignment, Submission.assignment_id == Assignment.id)
+        .join(Lesson, Assignment.lesson_id == Lesson.id)
+        .join(Course, Lesson.course_id == Course.id)
+        .join(User, Submission.student_id == User.id)
+        .where(Course.teacher_id == current_user.id)
+    )
+
+    # Apply status filter
+    if status_filter == "all":
+        # Show all except drafts
+        query = query.where(Submission.status != SubmissionStatus.DRAFT)
+    elif status_filter == "graded":
+        query = query.where(Submission.status == SubmissionStatus.GRADED)
+    elif status_filter == "returned":
+        query = query.where(Submission.status == SubmissionStatus.RETURNED)
+    else:
+        # Default: show only submitted (pending review)
+        query = query.where(Submission.status == SubmissionStatus.SUBMITTED)
+
+    query = query.order_by(Submission.submitted_at.desc())
+
+    result = await db.execute(query)
+
+    rows = result.all()
+    items = []
+
+    for submission, assignment, lesson, course, student in rows:
+        items.append(
+            PendingSubmissionItem(
+                submission_id=submission.id,
+                student_id=student.id,
+                student_name=f"{student.first_name} {student.last_name}",
+                student_email=student.email,
+                assignment_id=assignment.id,
+                assignment_title=assignment.title,
+                max_score=assignment.max_score,
+                lesson_id=lesson.id,
+                lesson_title=lesson.title,
+                course_id=course.id,
+                course_title=course.title,
+                content=submission.content,
+                file_url=submission.file_url,
+                submitted_at=submission.submitted_at,
+                status=submission.status.value,
+            )
+        )
+
+    return PendingSubmissionsResponse(items=items, total=len(items))
