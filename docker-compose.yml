@@ -38,7 +38,28 @@ services:
       - .:/app
       - ./uploads:/app/uploads
     command: >
-      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-8080} --reload"
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-8080}"
+
+  nginx:
+    image: nginx:alpine
+    container_name: psb_nginx
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - ./nginx/certbot:/var/www/certbot
+      - ./nginx/ssl:/etc/letsencrypt
+
+  certbot:
+    image: certbot/certbot
+    container_name: psb_certbot
+    volumes:
+      - ./nginx/certbot:/var/www/certbot
+      - ./nginx/ssl:/etc/letsencrypt
+    entrypoint: "/bin/sh"
 
 volumes:
   postgres_data:
