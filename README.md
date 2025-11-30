@@ -10,9 +10,9 @@
 
 | Участник | Роль | Контакт |
 |----------|------|---------|
-| Нуритдинова Аделина | Frontend-разработчик, UI/UX дизайнер | [@ledaina](https://t.me/ledaina) |
-| Дубинин Михаил | Backend-разработчик, DevOps | [@mikh1999](https://t.me/mikh1999) |
-| Ганеев Артур | Backend-разработчик, Data Engineer | [@ArturGD](https://t.me/ArturGD) |
+| Нуритдинова Аделина | UI/UX дизайнер | [@ledaina](https://t.me/ledaina) |
+| Дубинин Михаил | Backend-разработчик, Frontend-разработчик, Data Engineer, DevOps | [@mikh1999](https://t.me/mikh1999) |
+| Ганеев Артур | Системный аналитик | [@ArturGD](https://t.me/ArturGD) |
 
 ## Описание проекта
 
