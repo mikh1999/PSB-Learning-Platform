@@ -42,6 +42,27 @@ async def get_user_from_token(token: str, db: AsyncSession) -> User:
     return user
 
 
+def get_lesson_file_path(lesson) -> str | None:
+    """Get file path from lesson, checking file_url first, then content for legacy data."""
+    def normalize(p: str | None) -> str | None:
+        if not p:
+            return None
+        # Remove leading slash
+        path = p.lstrip("/")
+        # Handle various path formats:
+        # - /uploads/lessons/... -> lessons/...
+        # - uploads/lessons/... -> lessons/...
+        # - lessons/... -> lessons/...
+        if path.startswith("uploads/"):
+            path = path[8:]  # Remove "uploads/"
+        # Check if it's a lesson file path
+        if path.startswith("lessons/"):
+            return path
+        return None
+
+    return normalize(lesson.file_url) or normalize(lesson.content)
+
+
 # ============== File Validation ==============
 
 
@@ -158,14 +179,15 @@ async def download_lesson_file(
             detail="Урок не найден",
         )
 
-    if not lesson.file_url or not lesson.file_url.startswith("lessons/"):
+    file_path = get_lesson_file_path(lesson)
+    if not file_path:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="К этому уроку не прикреплён файл",
         )
 
-    filename = storage.get_filename(lesson.file_url)
-    content_type = storage.get_content_type(lesson.file_url)
+    filename = storage.get_filename(file_path)
+    content_type = storage.get_content_type(file_path)
 
     # For PDFs and images, show inline; for others, force download
     inline_types = [
@@ -183,7 +205,7 @@ async def download_lesson_file(
         disposition = f'attachment; filename="{filename}"'
 
     return StreamingResponse(
-        storage.download(lesson.file_url),
+        storage.download(file_path),
         media_type=content_type,
         headers={"Content-Disposition": disposition},
     )
@@ -217,9 +239,13 @@ async def delete_lesson_file(
             detail="Урок не найден",
         )
 
-    if lesson.file_url and lesson.file_url.startswith("lessons/"):
-        await storage.delete(lesson.file_url)
+    file_path = get_lesson_file_path(lesson)
+    if file_path:
+        await storage.delete(file_path)
         lesson.file_url = None
+        # Also clear content if it had a file path
+        if lesson.content and lesson.content.startswith("lessons/"):
+            lesson.content = None
         await db.commit()
 
     return {"message": "File deleted successfully"}
@@ -272,22 +298,22 @@ async def stream_lesson_video(
             detail="Урок не найден",
         )
 
-    # Check file exists
-    if not lesson.file_url or not lesson.file_url.startswith("lessons/"):
+    # Check file exists (with fallback to content for legacy data)
+    file_path = get_lesson_file_path(lesson)
+    if not file_path:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="К этому уроку не прикреплён файл",
         )
 
     # Check it's a video file
-    if not storage.is_video_file(lesson.file_url):
+    if not storage.is_video_file(file_path):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Этот эндпоинт поддерживает только видеофайлы. Используйте /files/lessons/ для других типов файлов.",
         )
 
     # Get file info
-    file_path = lesson.file_url
     file_size = storage.get_file_size(file_path)
     content_type = storage.get_content_type(file_path)
 
