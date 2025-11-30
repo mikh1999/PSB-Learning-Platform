@@ -103,15 +103,14 @@ async def upload_lesson_file(
         )
 
     # Delete old file if exists
-    if lesson.content and lesson.content.startswith("lessons/"):
-        await storage.delete(lesson.content)
+    if lesson.file_url and lesson.file_url.startswith("lessons/"):
+        await storage.delete(lesson.file_url)
 
     # Upload new file
     file_path = await storage.upload(file, "lessons", lesson_id)
 
-    # Update lesson content with file path
-    lesson.content = file_path
-    lesson.content_type = "file"
+    # Update lesson file_url with file path
+    lesson.file_url = file_path
     await db.commit()
 
     return {
@@ -159,14 +158,14 @@ async def download_lesson_file(
             detail="Урок не найден",
         )
 
-    if not lesson.content or not lesson.content.startswith("lessons/"):
+    if not lesson.file_url or not lesson.file_url.startswith("lessons/"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="К этому уроку не прикреплён файл",
         )
 
-    filename = storage.get_filename(lesson.content)
-    content_type = storage.get_content_type(lesson.content)
+    filename = storage.get_filename(lesson.file_url)
+    content_type = storage.get_content_type(lesson.file_url)
 
     # For PDFs and images, show inline; for others, force download
     inline_types = [
@@ -184,7 +183,7 @@ async def download_lesson_file(
         disposition = f'attachment; filename="{filename}"'
 
     return StreamingResponse(
-        storage.download(lesson.content),
+        storage.download(lesson.file_url),
         media_type=content_type,
         headers={"Content-Disposition": disposition},
     )
@@ -218,9 +217,9 @@ async def delete_lesson_file(
             detail="Урок не найден",
         )
 
-    if lesson.content and lesson.content.startswith("lessons/"):
-        await storage.delete(lesson.content)
-        lesson.content = None
+    if lesson.file_url and lesson.file_url.startswith("lessons/"):
+        await storage.delete(lesson.file_url)
+        lesson.file_url = None
         await db.commit()
 
     return {"message": "File deleted successfully"}
@@ -274,21 +273,21 @@ async def stream_lesson_video(
         )
 
     # Check file exists
-    if not lesson.content or not lesson.content.startswith("lessons/"):
+    if not lesson.file_url or not lesson.file_url.startswith("lessons/"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="К этому уроку не прикреплён файл",
         )
 
     # Check it's a video file
-    if not storage.is_video_file(lesson.content):
+    if not storage.is_video_file(lesson.file_url):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Этот эндпоинт поддерживает только видеофайлы. Используйте /files/lessons/ для других типов файлов.",
         )
 
     # Get file info
-    file_path = lesson.content
+    file_path = lesson.file_url
     file_size = storage.get_file_size(file_path)
     content_type = storage.get_content_type(file_path)
 
@@ -392,9 +391,25 @@ async def upload_submission_file(
 async def download_submission_file(
     submission_id: int,
     db: Annotated[AsyncSession, Depends(get_async_session)],
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User | None, Depends(get_current_user_optional)],
+    token: str | None = None,
 ):
-    """Download submission file. Owner and course teacher can download."""
+    """
+    Download submission file. Owner and course teacher can download.
+
+    Authentication: via Authorization header OR ?token= query parameter.
+    Query parameter is needed for links in browser.
+    """
+    # Authenticate via header or query parameter
+    if current_user is None and token:
+        current_user = await get_user_from_token(token, db)
+
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Требуется аутентификация",
+        )
+
     submission = await submission_crud.get_by_id(db, submission_id)
     if not submission:
         raise HTTPException(
