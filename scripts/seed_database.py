@@ -13,8 +13,8 @@ DB_CONFIG = {
     "host": "194.87.74.244",
     "port": 5432,
     "database": "psb_db",
-    "user": "postgres",
-    "password": "postgres",
+    "user": "psb_admin",
+    "password": "K9tZrW7!eN4uJa5sf3vLp@8yHdG2Rxb",
 }
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
